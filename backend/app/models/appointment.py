@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, JSON
+from sqlalchemy import Column, String, DateTime, JSON, Integer
 from app.db.database import Base
 from datetime import datetime, timezone
 import uuid
@@ -14,6 +14,5 @@ class Appointment(Base):
     end_time = Column(DateTime, nullable=False)
     calendar_id = Column(String)
     status = Column(String, default="confirmed")
-    metadata = Column(JSON, default=dict)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

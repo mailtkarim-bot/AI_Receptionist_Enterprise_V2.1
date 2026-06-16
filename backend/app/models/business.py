@@ -14,5 +14,6 @@ class Business(Base):
     features = Column(JSON, default=list)
     limits = Column(JSON, default=dict)
     settings = Column(JSON, default=dict)
+    is_active = Column(Boolean, default=True, nullable=False)  # CRIT-07 fix
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

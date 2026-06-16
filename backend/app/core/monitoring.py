@@ -8,6 +8,8 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
+from app.core.config import get_settings
+
 try:
     from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
     PROMETHEUS_AVAILABLE = True
@@ -26,7 +28,6 @@ if PROMETHEUS_AVAILABLE:
     WEBHOOK_COUNT = Counter("webhooks_total", "Total webhooks", ["source", "status"])
     DB_CONNECTIONS = Gauge("db_connections_active", "Active DB connections")
     TIER_USAGE = Gauge("tier_usage_percentage", "Tier usage %", ["business_id", "metric"])
-
 
 class MetricsMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
@@ -51,17 +52,32 @@ class MetricsMiddleware(BaseHTTPMiddleware):
                     ERROR_COUNT.labels(error_type="rate_limited", endpoint=endpoint).inc()
         return response
 
-
-async def metrics_endpoint():
+async def metrics_endpoint(request: Request):
     if not PROMETHEUS_AVAILABLE:
         return {"error": "Prometheus client not installed"}
-    from fastapi import Response
+    from fastapi import Response, HTTPException
+    api_key = request.headers.get("X-Metrics-Key")
+    if api_key != get_settings().METRICS_API_KEY:
+        raise HTTPException(status_code=403, detail="Access denied")
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
-
 async def health_check() -> dict:
-    return {"status": "healthy", "timestamp": time.time(), "version": "2.0.0", "checks": {"api": "ok"}}
-
+    from app.db.database import engine
+    from app.core.token_store import get_redis
+    checks = {"api": "ok"}
+    try:
+        async with engine.connect() as conn:
+            await conn.execute("SELECT 1")
+        checks["db"] = "ok"
+    except Exception as e:
+        checks["db"] = f"error: {str(e)}"
+    try:
+        r = await get_redis()
+        await r.ping()
+        checks["redis"] = "ok"
+    except Exception as e:
+        checks["redis"] = f"error: {str(e)}"
+    return {"status": "healthy" if all(v == "ok" for v in checks.values()) else "degraded", "timestamp": time.time(), "version": "2.1.0", "checks": checks}
 
 def track_call(direction: str, business_id: str):
     def decorator(func: Callable):

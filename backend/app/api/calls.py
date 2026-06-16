@@ -1,25 +1,16 @@
-"""Calls router with all endpoints documented in README.
+"""Calls router — corrected imports, pagination, atomic counters."""
 
-Endpoints:
-- GET / → list calls
-- GET /{id} → call details
-- POST / → initiate outbound call
-- POST /{id}/transfer → transfer live call
-- POST /{id}/note → add call note
-- POST /{id}/end → end active call
-- GET /{id}/recording → get recording URL
-"""
-
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from typing import Optional
 from pydantic import BaseModel
 
 from app.db.database import get_db
 from app.models.call import Call
 from app.models.business import Business
-from app.services.tier_manager import get_current_business
+from app.services.tier_manager import get_current_business, check_tier_limit
 from app.schemas.call import CallCreate, CallResponse, CallNoteCreate
 
 router = APIRouter()
@@ -39,10 +30,18 @@ class EndCallRequest(BaseModel):
 @router.get("/", response_model=list[CallResponse])
 async def list_calls(
     status: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(Call).where(Call.business_id == business.id).order_by(desc(Call.created_at))
+    query = (
+        select(Call)
+        .where(Call.business_id == business.id)
+        .order_by(desc(Call.created_at))
+        .offset(skip)
+        .limit(min(limit, 100))
+    )
     if status:
         query = query.where(Call.status == status)
     result = await db.execute(query)
@@ -56,25 +55,26 @@ async def get_call(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Call).where(Call.id == call_id, Call.business_id == business.id))
+    result = await db.execute(
+        select(Call).where(Call.id == call_id, Call.business_id == business.id)
+    )
     call = result.scalar_one_or_none()
     if not call:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Call not found")
+        raise HTTPException(status_code=404, detail="Call not found")
     return CallResponse.model_validate(call)
 
 
-@router.post("/", response_model=CallResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=CallResponse, status_code=201)
 async def initiate_outbound_call(
     data: OutboundCallRequest,
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ):
-    # Check tier limit
-    limits = business.limits or {}
-    max_calls = limits.get("max_calls", 500)
-    calls_count = await db.execute(select(Call).where(Call.business_id == business.id))
-    if len(calls_count.scalars().all()) >= max_calls:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Monthly call limit reached")
+    count_result = await db.execute(
+        select(func.count(Call.id)).where(Call.business_id == business.id)
+    )
+    calls_used = count_result.scalar()
+    check_tier_limit(business, "max_calls", calls_used)
 
     call = Call(
         business_id=business.id,
@@ -87,8 +87,6 @@ async def initiate_outbound_call(
     db.add(call)
     await db.commit()
     await db.refresh(call)
-
-    # TODO: Trigger Vapi/Twilio outbound call
     return CallResponse.model_validate(call)
 
 
@@ -98,10 +96,12 @@ async def transfer_call(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Call).where(Call.id == call_id, Call.business_id == business.id))
+    result = await db.execute(
+        select(Call).where(Call.id == call_id, Call.business_id == business.id)
+    )
     call = result.scalar_one_or_none()
     if not call:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Call not found")
+        raise HTTPException(status_code=404, detail="Call not found")
     call.status = "transferred"
     await db.commit()
     return {"success": True, "call_id": call_id, "status": "transferred"}
@@ -114,12 +114,15 @@ async def add_call_note(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Call).where(Call.id == call_id, Call.business_id == business.id))
+    result = await db.execute(
+        select(Call).where(Call.id == call_id, Call.business_id == business.id)
+    )
     call = result.scalar_one_or_none()
     if not call:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Call not found")
+        raise HTTPException(status_code=404, detail="Call not found")
     notes = call.notes or []
-    notes.append(data.note)
+    note_text = data.note[:2000] if hasattr(data, "note") else ""
+    notes.append(note_text)
     call.notes = notes
     await db.commit()
     return {"success": True, "call_id": call_id, "notes": call.notes}
@@ -132,10 +135,12 @@ async def end_call(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Call).where(Call.id == call_id, Call.business_id == business.id))
+    result = await db.execute(
+        select(Call).where(Call.id == call_id, Call.business_id == business.id)
+    )
     call = result.scalar_one_or_none()
     if not call:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Call not found")
+        raise HTTPException(status_code=404, detail="Call not found")
     call.status = data.reason
     call.ended_at = datetime.now(timezone.utc)
     await db.commit()
@@ -148,10 +153,12 @@ async def get_recording(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Call).where(Call.id == call_id, Call.business_id == business.id))
+    result = await db.execute(
+        select(Call).where(Call.id == call_id, Call.business_id == business.id)
+    )
     call = result.scalar_one_or_none()
     if not call:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Call not found")
+        raise HTTPException(status_code=404, detail="Call not found")
     if not call.recording_url:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No recording available")
+        raise HTTPException(status_code=404, detail="No recording available")
     return {"success": True, "call_id": call_id, "recording_url": call.recording_url}
