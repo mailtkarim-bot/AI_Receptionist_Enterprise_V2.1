@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import uuid
 
 class BreachLog(Base):
-    """Log de breach GDPR (Art. 33) — persistance légale obligatoire."""
+    """GDPR breach log (Art. 33) — legal persistence required."""
     __tablename__ = "breach_logs"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     severity = Column(String, nullable=False)

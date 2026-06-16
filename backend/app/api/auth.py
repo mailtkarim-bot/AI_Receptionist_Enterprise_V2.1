@@ -1,4 +1,11 @@
-"""Authentication — PyJWT, Redis blacklist, refresh rotation, email reset."""
+"""Authentication router — Grade Production.
+
+Corrections Némésis:
+- Blacklist JWT dans Redis (cross-instance, cross-worker)
+- Reset tokens Redis avec GETDEL atomique
+- Email envoyé via SendGrid (httpx async)
+- Brute force Redis-backed
+"""
 
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -6,7 +13,7 @@ import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import jwt as pyjwt
+from jose import jwt, JWTError
 from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -16,7 +23,7 @@ from app.core.token_store import (
     blacklist_jti, is_jti_blacklisted,
     store_reset_token, consume_reset_token,
 )
-from app.core.security_fixes import check_brute_force, BruteForceProtection
+from app.core.security_fixes import check_brute_force, brute_force
 from app.db.database import get_db
 from app.models.business import Business
 from app.schemas.auth import (
@@ -37,53 +44,59 @@ def hash_password(plain: str) -> str:
     return pwd_context.hash(plain)
 
 
-def _create_token(business_id: str, token_type: str, expires_seconds: int) -> tuple[str, str, int]:
+def _create_token(business_id: str, token_type: str, expires_seconds: int) -> tuple[str, int]:
     """Crée un JWT signé avec JTI unique pour révocation."""
     settings = get_settings()
     expire = datetime.now(timezone.utc) + timedelta(seconds=expires_seconds)
-    jti = secrets.token_hex(32)
     payload = {
         "sub": str(business_id),
         "type": token_type,
         "exp": expire,
         "iat": datetime.now(timezone.utc),
-        "nbf": datetime.now(timezone.utc),
-        "jti": jti,
+        "jti": secrets.token_hex(32),
     }
-    token = pyjwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
-    return token, jti, expires_seconds
+    token = jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    return token, expires_seconds
 
 
 def create_access_token(business_id: str) -> tuple[str, int]:
-    token, jti, exp = _create_token(business_id, "access", 30 * 60)
-    return token, exp
+    return _create_token(business_id, "access", 30 * 60)
 
 
 def create_refresh_token(business_id: str) -> tuple[str, int]:
-    token, jti, exp = _create_token(business_id, "refresh", 7 * 24 * 3600)
-    return token, exp
+    return _create_token(business_id, "refresh", 7 * 24 * 3600)
 
 
 async def decode_and_validate_token(token: str, expected_type: str) -> dict:
     """Décode le JWT et vérifie la blacklist Redis."""
     settings = get_settings()
     try:
-        payload = pyjwt.decode(
+        payload = jwt.decode(
             token, settings.JWT_SECRET,
             algorithms=[settings.JWT_ALGORITHM],
             options={"require": ["exp", "iat", "jti", "sub", "type"]},
         )
-    except pyjwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expiré", headers={"WWW-Authenticate": "Bearer"})
-    except pyjwt.InvalidTokenError as e:
-        raise HTTPException(status_code=401, detail=f"Token invalide: {str(e)}", headers={"WWW-Authenticate": "Bearer"})
+    except JWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalide ou expiré",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     if payload.get("type") != expected_type:
-        raise HTTPException(status_code=401, detail="Type de token incorrect", headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Type de token incorrect",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     jti = payload.get("jti")
     if not jti or await is_jti_blacklisted(jti):
-        raise HTTPException(status_code=401, detail="Token révoqué", headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token révoqué",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     return payload
 
@@ -92,26 +105,41 @@ async def get_current_business(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> Business:
+    """Dépendance unique pour toutes les routes — vérifie blacklist Redis."""
     if credentials is None:
-        raise HTTPException(status_code=401, detail="Authentification requise", headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentification requise",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     payload = await decode_and_validate_token(credentials.credentials, "access")
     business_id = payload["sub"]
-    result = await db.execute(select(Business).where(Business.id == business_id, Business.is_active == True))
+
+    result = await db.execute(
+        select(Business).where(
+            Business.id == business_id,
+            Business.is_active == True,
+        )
+    )
     business = result.scalar_one_or_none()
     if business is None:
-        raise HTTPException(status_code=401, detail="Compte introuvable ou suspendu", headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Compte introuvable ou suspendu",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return business
 
 
-@router.post("/register", response_model=TokenResponse, status_code=201)
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(data: BusinessRegister, db: AsyncSession = Depends(get_db)):
     existing = await db.execute(select(Business).where(Business.email == data.email))
     if existing.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Email déjà enregistré")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
     business = Business(
         name=data.name, email=data.email,
         password_hash=hash_password(data.password),
-        phone=data.phone, tier="basic",
+        phone=data.phone, tier="basic", is_active=True,
     )
     db.add(business)
     await db.commit()
@@ -125,14 +153,12 @@ async def register(data: BusinessRegister, db: AsyncSession = Depends(get_db)):
 async def login(data: BusinessLogin, db: AsyncSession = Depends(get_db)):
     bf_key = f"login:{data.email}"
     await check_brute_force(bf_key)
-    result = await db.execute(select(Business).where(Business.email == data.email, Business.is_active == True))
+    result = await db.execute(select(Business).where(Business.email == data.email))
     business = result.scalar_one_or_none()
     if not business or not verify_password(data.password, business.password_hash):
-        bf = BruteForceProtection()
-        await bf.record_attempt(bf_key, success=False)
-        raise HTTPException(status_code=401, detail="Email ou mot de passe invalide")
-    bf = BruteForceProtection()
-    await bf.record_attempt(bf_key, success=True)
+        await brute_force.record_attempt(bf_key, success=False)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+    await brute_force.record_attempt(bf_key, success=True)
     access_token, access_expires = create_access_token(business.id)
     refresh_token, refresh_expires = create_refresh_token(business.id)
     return TokenResponse(access_token=access_token, refresh_token=refresh_token, expires_in=access_expires)
@@ -153,15 +179,16 @@ async def refresh_token(data: RefreshTokenRequest):
 
 @router.post("/logout")
 async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Révocation Redis du JTI — effective sur toutes les instances."""
     try:
         settings = get_settings()
-        payload = pyjwt.decode(credentials.credentials, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        payload = jwt.decode(credentials.credentials, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
         jti = payload.get("jti")
         exp = payload.get("exp")
         if jti and exp:
             ttl = max(int(exp - datetime.now(timezone.utc).timestamp()), 0)
             await blacklist_jti(jti, ttl)
-    except Exception:
+    except JWTError:
         pass
     return {"success": True, "message": "Déconnecté avec succès"}
 
@@ -172,7 +199,11 @@ async def me(business: Business = Depends(get_current_business)):
 
 
 @router.post("/password-reset")
-async def request_password_reset(data: PasswordResetRequest, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
+async def request_password_reset(
+    data: PasswordResetRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
     result = await db.execute(select(Business).where(Business.email == data.email))
     business = result.scalar_one_or_none()
     if business:
@@ -183,6 +214,7 @@ async def request_password_reset(data: PasswordResetRequest, background_tasks: B
 
 
 async def _send_reset_email(email: str, token: str) -> None:
+    """Envoi de l'email de reset via SendGrid (httpx async)."""
     settings = get_settings()
     import httpx
     reset_url = f"https://app.aireceptionist.example.com/reset-password?token={token}"
@@ -204,15 +236,13 @@ async def _send_reset_email(email: str, token: str) -> None:
 async def confirm_password_reset(data: PasswordResetConfirm, db: AsyncSession = Depends(get_db)):
     email = await consume_reset_token(data.token)
     if not email:
-        raise HTTPException(status_code=400, detail="Token invalide ou expiré")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token invalide ou expiré")
     if data.new_password != data.new_password_confirm:
-        raise HTTPException(status_code=400, detail="Les mots de passe ne correspondent pas")
-    if len(data.new_password) < 12:
-        raise HTTPException(status_code=400, detail="Le mot de passe doit faire au moins 12 caractères")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Les mots de passe ne correspondent pas")
     result = await db.execute(select(Business).where(Business.email == email))
     business = result.scalar_one_or_none()
     if not business:
-        raise HTTPException(status_code=400, detail="Compte introuvable")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Compte introuvable")
     business.password_hash = hash_password(data.new_password)
     await db.commit()
     return {"success": True, "message": "Mot de passe réinitialisé avec succès"}

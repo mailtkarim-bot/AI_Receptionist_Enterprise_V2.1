@@ -1,4 +1,7 @@
-"""Token store Redis pour blacklist JWT cross-instance et cross-worker."""
+"""Token store Redis pour blacklist JWT cross-instance et cross-worker.
+
+Toutes les instances partagent le même Redis → révocation réelle.
+"""
 
 import redis.asyncio as aioredis
 from app.core.config import get_settings
@@ -7,6 +10,7 @@ _redis_client: aioredis.Redis | None = None
 
 
 async def get_redis() -> aioredis.Redis:
+    """Retourne le client Redis async (singleton)."""
     global _redis_client
     if _redis_client is None:
         settings = get_settings()
@@ -33,7 +37,7 @@ async def store_reset_token(token: str, email: str, ttl_seconds: int = 3600) -> 
 
 
 async def consume_reset_token(token: str) -> str | None:
-    """Récupère et supprime atomiquement le token (one-time use)."""
+    """Récupère et supprime atomiquement le token (one-time use via GETDEL)."""
     r = await get_redis()
     return await r.getdel(f"pwreset:{token}")
 

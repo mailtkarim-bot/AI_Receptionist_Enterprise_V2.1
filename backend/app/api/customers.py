@@ -1,4 +1,7 @@
-"""Customers router — NameError fixé, imports complets."""
+"""Customers router avec imports corrects.
+
+Correction Némésis CRIT-08: NameError CallResponse/SMSResponse résolu.
+"""
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +17,6 @@ from app.models.business import Business
 from app.services.tier_manager import get_current_business
 from app.schemas.customer import CustomerCreate, CustomerResponse, CustomerUpdate
 from app.schemas.call import CallResponse
-from app.schemas.customer import SMSMessageResponse
 
 router = APIRouter()
 
@@ -27,18 +29,10 @@ class TagRequest(BaseModel):
 @router.get("/", response_model=list[CustomerResponse])
 async def list_customers(
     search: Optional[str] = None,
-    skip: int = 0,
-    limit: int = 50,
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ):
-    query = (
-        select(Customer)
-        .where(Customer.business_id == business.id)
-        .order_by(desc(Customer.created_at))
-        .offset(skip)
-        .limit(min(limit, 100))
-    )
+    query = select(Customer).where(Customer.business_id == business.id).order_by(desc(Customer.created_at))
     if search:
         query = query.where(Customer.name.ilike(f"%{search}%") | Customer.phone.ilike(f"%{search}%"))
     result = await db.execute(query)
@@ -52,12 +46,10 @@ async def get_customer(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(Customer).where(Customer.id == customer_id, Customer.business_id == business.id)
-    )
+    result = await db.execute(select(Customer).where(Customer.id == customer_id, Customer.business_id == business.id))
     customer = result.scalar_one_or_none()
     if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
     return CustomerResponse.model_validate(customer)
 
 
@@ -68,12 +60,10 @@ async def update_customer(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(Customer).where(Customer.id == customer_id, Customer.business_id == business.id)
-    )
+    result = await db.execute(select(Customer).where(Customer.id == customer_id, Customer.business_id == business.id))
     customer = result.scalar_one_or_none()
     if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
     update_data = data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(customer, field, value)
@@ -88,22 +78,16 @@ async def get_customer_history(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(Customer).where(Customer.id == customer_id, Customer.business_id == business.id)
-    )
+    result = await db.execute(select(Customer).where(Customer.id == customer_id, Customer.business_id == business.id))
     customer = result.scalar_one_or_none()
     if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
-    calls = await db.execute(
-        select(Call).where(Call.customer_id == customer_id).order_by(desc(Call.created_at))
-    )
-    sms = await db.execute(
-        select(SMSMessage).where(SMSMessage.customer_id == customer_id).order_by(desc(SMSMessage.created_at))
-    )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
+    calls = await db.execute(select(Call).where(Call.customer_id == customer_id).order_by(desc(Call.created_at)))
+    sms = await db.execute(select(SMSMessage).where(SMSMessage.customer_id == customer_id).order_by(desc(SMSMessage.created_at)))
     return {
         "customer_id": customer_id,
         "calls": [CallResponse.model_validate(c) for c in calls.scalars().all()],
-        "sms_messages": [SMSMessageResponse.model_validate(s) for s in sms.scalars().all()],
+        "sms_messages": [{"id": s.id, "content": s.content, "direction": s.direction, "created_at": s.created_at} for s in sms.scalars().all()],
     }
 
 
@@ -114,19 +98,17 @@ async def tag_customer(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(Customer).where(Customer.id == customer_id, Customer.business_id == business.id)
-    )
+    result = await db.execute(select(Customer).where(Customer.id == customer_id, Customer.business_id == business.id))
     customer = result.scalar_one_or_none()
     if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
     tags = set(customer.tags or [])
     if data.action == "add":
         tags.add(data.tag)
     elif data.action == "remove":
         tags.discard(data.tag)
     else:
-        raise HTTPException(status_code=400, detail="action must be 'add' or 'remove'")
+        raise HTTPException(status_code=400, detail="Action must be 'add' or 'remove'")
     customer.tags = list(tags)
     await db.commit()
     return {"success": True, "customer_id": customer_id, "tags": customer.tags}
@@ -138,12 +120,10 @@ async def delete_customer(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(Customer).where(Customer.id == customer_id, Customer.business_id == business.id)
-    )
+    result = await db.execute(select(Customer).where(Customer.id == customer_id, Customer.business_id == business.id))
     customer = result.scalar_one_or_none()
     if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
     await db.delete(customer)
     await db.commit()
     return {"success": True, "message": "Customer deleted"}

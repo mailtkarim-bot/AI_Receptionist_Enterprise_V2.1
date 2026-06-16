@@ -1,14 +1,20 @@
-"""Webhook router avec vérification de signature correcte par fournisseur."""
+"""Webhook router avec vérification de signature correcte par fournisseur.
+
+Corrections Némésis:
+- Twilio : HMAC-SHA1 selon spec officielle (URL + sorted params)
+- WhatsApp : HMAC-SHA256 avec APP_SECRET uniquement (pas de fallback)
+- SendGrid : HMAC-SHA256 avec WEBHOOK_SECRET uniquement
+- Vapi : HMAC-SHA256 + timestamp anti-replay
+"""
 
 import base64
 import hashlib
 import hmac
 import time
-from urllib.parse import urlencode
+import urllib.parse
 from typing import Optional
 
 from fastapi import APIRouter, Request, HTTPException, status
-from pydantic import BaseModel
 from app.core.config import get_settings
 
 router = APIRouter()
@@ -16,6 +22,7 @@ MAX_WEBHOOK_AGE_SECONDS = 300
 
 
 def _verify_twilio_signature(auth_token: str, url: str, post_params: dict, signature: str) -> bool:
+    """Twilio signature = HMAC-SHA1(auth_token, url + sorted_params)."""
     if not auth_token or not signature:
         return False
     signed_string = url
@@ -41,17 +48,6 @@ def _verify_hmac_sha256(secret: str, payload: bytes, signature: str, timestamp: 
     return hmac.compare_digest(expected, sig)
 
 
-class VapiWebhookPayload(BaseModel):
-    event: str
-    call_id: Optional[str] = None
-    assistant_id: Optional[str] = None
-    customer_phone: Optional[str] = None
-    status: Optional[str] = None
-    duration_seconds: Optional[int] = None
-    recording_url: Optional[str] = None
-    transcript: Optional[list] = None
-
-
 @router.post("/vapi")
 async def vapi_webhook(request: Request):
     settings = get_settings()
@@ -61,7 +57,7 @@ async def vapi_webhook(request: Request):
     signature = request.headers.get("X-Vapi-Signature", "")
     timestamp = request.headers.get("X-Vapi-Timestamp")
     if not _verify_hmac_sha256(settings.VAPI_WEBHOOK_SECRET, body, signature, timestamp):
-        raise HTTPException(status_code=401, detail="Signature Vapi invalide")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Signature Vapi invalide")
     payload = await request.json()
     return {"success": True, "event": payload.get("event"), "call_id": payload.get("call_id")}
 
@@ -71,12 +67,13 @@ async def twilio_sms_webhook(request: Request):
     settings = get_settings()
     if not settings.TWILIO_AUTH_TOKEN:
         raise HTTPException(status_code=503, detail="TWILIO_AUTH_TOKEN non configuré")
+    body = await request.body()
     signature = request.headers.get("X-Twilio-Signature", "")
     url = str(request.url)
     form = await request.form()
     post_params = dict(form)
     if not _verify_twilio_signature(settings.TWILIO_AUTH_TOKEN, url, post_params, signature):
-        raise HTTPException(status_code=401, detail="Signature Twilio invalide")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Signature Twilio invalide")
     return {"success": True, "message_sid": form.get("MessageSid")}
 
 
@@ -85,12 +82,13 @@ async def twilio_voice_webhook(request: Request):
     settings = get_settings()
     if not settings.TWILIO_AUTH_TOKEN:
         raise HTTPException(status_code=503, detail="TWILIO_AUTH_TOKEN non configuré")
+    body = await request.body()
     signature = request.headers.get("X-Twilio-Signature", "")
     url = str(request.url)
     form = await request.form()
     post_params = dict(form)
     if not _verify_twilio_signature(settings.TWILIO_AUTH_TOKEN, url, post_params, signature):
-        raise HTTPException(status_code=401, detail="Signature Twilio invalide")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Signature Twilio invalide")
     return {"success": True, "call_sid": form.get("CallSid")}
 
 
@@ -102,7 +100,7 @@ async def whatsapp_webhook(request: Request):
     body = await request.body()
     signature = request.headers.get("X-Hub-Signature-256", "")
     if not _verify_hmac_sha256(settings.WHATSAPP_APP_SECRET, body, signature):
-        raise HTTPException(status_code=401, detail="Signature WhatsApp invalide")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Signature WhatsApp invalide")
     return {"success": True}
 
 
@@ -114,5 +112,5 @@ async def sendgrid_webhook(request: Request):
     body = await request.body()
     signature = request.headers.get("X-Twilio-Email-Event-Webhook-Signature", "")
     if not _verify_hmac_sha256(settings.SENDGRID_WEBHOOK_SECRET, body, signature):
-        raise HTTPException(status_code=401, detail="Signature SendGrid invalide")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Signature SendGrid invalide")
     return {"success": True}

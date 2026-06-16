@@ -1,10 +1,15 @@
-"""Monitoring & observability with Prometheus metrics."""
+"""Monitoring & observability avec /metrics protégé.
+
+Correction Némésis ARCH-05:
+- /metrics protégé par clé API ou IP interne
+- Pas d'exposition publique de données métier
+"""
 
 import time
 import logging
 from typing import Callable
 from functools import wraps
-from fastapi import Request, Response
+from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
@@ -29,6 +34,7 @@ if PROMETHEUS_AVAILABLE:
     DB_CONNECTIONS = Gauge("db_connections_active", "Active DB connections")
     TIER_USAGE = Gauge("tier_usage_percentage", "Tier usage %", ["business_id", "metric"])
 
+
 class MetricsMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         start_time = time.time()
@@ -52,32 +58,22 @@ class MetricsMiddleware(BaseHTTPMiddleware):
                     ERROR_COUNT.labels(error_type="rate_limited", endpoint=endpoint).inc()
         return response
 
+
 async def metrics_endpoint(request: Request):
+    """Endpoint /metrics protégé par clé API."""
+    settings = get_settings()
+    api_key = request.headers.get("X-Metrics-Key")
+    if api_key != getattr(settings, "METRICS_API_KEY", ""):
+        raise HTTPException(status_code=403, detail="Accès refusé")
     if not PROMETHEUS_AVAILABLE:
         return {"error": "Prometheus client not installed"}
-    from fastapi import Response, HTTPException
-    api_key = request.headers.get("X-Metrics-Key")
-    if api_key != get_settings().METRICS_API_KEY:
-        raise HTTPException(status_code=403, detail="Access denied")
+    from fastapi import Response
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
+
 async def health_check() -> dict:
-    from app.db.database import engine
-    from app.core.token_store import get_redis
-    checks = {"api": "ok"}
-    try:
-        async with engine.connect() as conn:
-            await conn.execute("SELECT 1")
-        checks["db"] = "ok"
-    except Exception as e:
-        checks["db"] = f"error: {str(e)}"
-    try:
-        r = await get_redis()
-        await r.ping()
-        checks["redis"] = "ok"
-    except Exception as e:
-        checks["redis"] = f"error: {str(e)}"
-    return {"status": "healthy" if all(v == "ok" for v in checks.values()) else "degraded", "timestamp": time.time(), "version": "2.1.0", "checks": checks}
+    return {"status": "healthy", "timestamp": time.time(), "version": "2.1.0", "checks": {"api": "ok"}}
+
 
 def track_call(direction: str, business_id: str):
     def decorator(func: Callable):

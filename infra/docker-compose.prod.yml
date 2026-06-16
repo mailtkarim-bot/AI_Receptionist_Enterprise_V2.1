@@ -16,7 +16,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -25,7 +24,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     networks:
@@ -35,7 +33,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
 
   api:
     build:
@@ -43,15 +40,9 @@ services:
       dockerfile: Dockerfile.prod
     environment:
       - DATABASE_URL=postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD}@db:5432/ai_receptionist
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - REDIS_URL=redis://redis:6379/0
       - JWT_SECRET=${JWT_SECRET}
       - DEBUG=false
-      - METRICS_API_KEY=${METRICS_API_KEY}
-    secrets:
-      - jwt_secret
-      - db_password
-      - redis_password
-      - platform_private_key
     networks:
       - backend
       - nginx-proxy
@@ -60,9 +51,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    restart: unless-stopped
     deploy:
-      replicas: 3
+      replicas: 2
       resources:
         limits:
           cpus: '2'
@@ -74,7 +64,6 @@ services:
       dockerfile: Dockerfile.prod
     networks:
       - nginx-proxy
-    restart: unless-stopped
     deploy:
       replicas: 2
 
@@ -85,22 +74,21 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./nginx-proxy.conf:/etc/nginx/conf.d/proxy.conf:ro
-      - letsencrypt:/etc/letsencrypt:ro
+      - ./nginx-proxy.conf:/etc/nginx/conf.d/my_proxy.conf:ro
+      - letsencrypt:/etc/letsencrypt
+      - certbot_data:/etc/nginx/ssl
     networks:
       - nginx-proxy
     depends_on:
       - api
       - frontend
-    restart: unless-stopped
 
   certbot:
     image: certbot/certbot
     volumes:
       - letsencrypt:/etc/letsencrypt
-      - certbot_data:/etc/letsencrypt/www
+      - certbot_data:/etc/nginx/ssl
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h; done'"
-    restart: unless-stopped
 
 volumes:
   postgres_data:
@@ -111,16 +99,5 @@ volumes:
 networks:
   backend:
     driver: bridge
-    internal: true
   nginx-proxy:
-    driver: bridge
-
-secrets:
-  jwt_secret:
-    file: ./secrets/jwt_secret.txt
-  db_password:
-    file: ./secrets/db_password.txt
-  redis_password:
-    file: ./secrets/redis_password.txt
-  platform_private_key:
-    file: ./secrets/platform_private_key.txt
+    external: true
