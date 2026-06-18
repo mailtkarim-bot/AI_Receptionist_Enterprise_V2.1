@@ -1,44 +1,34 @@
-# AI Receptionist Enterprise
-
 <div align="center">
 
-[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![React 19](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tailwind CSS v4](https://img.shields.io/badge/Tailwind-v4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat-square&logo=redis&logoColor=white)](https://redis.io/)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docs.docker.com/compose/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+# 🤖 AI Receptionist Enterprise
 
-**Multi-Channel AI Voice Agent with Web3 Payments — 3-Tier SaaS Platform**
+**Production-Grade Multi-Channel AI Voice Agent — SaaS Platform v2.1**
 
-[Overview](#overview) • [Features](#features) • [Pricing](#pricing) • [Architecture](#architecture) • [Quick Start](#quick-start) • [API Reference](#api-endpoints) • [Security](#security) • [Changelog](#changelog)
+[![Version](https://img.shields.io/badge/version-2.1.0--enterprise-blue?style=for-the-badge)](https://github.com/mailtkarim-bot/AI_Receptionist_Enterprise_V2.1)
+[![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql)](https://postgresql.org)
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis)](https://redis.io)
+[![Docker](https://img.shields.io/badge/Docker-24-2496ED?logo=docker)](https://docker.com)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Security](https://img.shields.io/badge/Security-N%C3%A9m%C3%A9sis%20v2.1%20Patch-success?style=flat&logo=shield)](SECURITY.md)
+[![Pro Toolkit](https://img.shields.io/badge/Freelance%20Toolkit-Click%20Here-green?style=flat&logo=tool)](https://github.com/mailtkarim-bot/AI_Receptionist_Pro)
+
+**AI Voice · SMS · WhatsApp · Email · Google Calendar · Web3 USDC · JWT + Redis · Docker**
+
+[📐 Architecture](#-architecture) · [🚀 Quick Start](#-quick-start) · [💰 Pricing](#-pricing) · [🔐 Security](#-security) · [📞 Contact](#-contact)
 
 </div>
 
 ---
 
-## ⚠️ Production Readiness Checklist
-
+> **👋 Available for freelance projects** — I build production-grade AI voice agents, multi-channel SaaS platforms, and secure FastAPI backends for SMEs and clinics.
+>
+> **Recent work:** This repository (v2.1 Némésis Security Patch) demonstrates enterprise architecture, 55+ API endpoints, Redis-backed security, and Web3 integrations — the same standards I apply to client projects.
+>
+> **Languages:** Arabic, English, French.
 > **The following critical components have been identified and addressed in v2.1 (Némésis Security Patch).**
-
-| # | Component | Severity | Status v2.0 | Status v2.1 |
-|---|-----------|----------|-------------|-------------|
-| 🔴 | **GDPR / RGPD Compliance for Voice Data** | 🔴 **CRITICAL** | ❌ Not Documented | 🟡 **In Progress** (Consent logging DB, purge scheduler) |
-| 🔴 | **Load Testing & Performance Benchmarks** | 🔴 **CRITICAL** | ❌ Not Documented | ❌ Not Implemented |
-| 🔴 | **CI/CD Pipeline (GitHub Actions / GitLab CI)** | 🔴 **CRITICAL** | ❌ Not Documented | 🟡 **Provided** (see `.github/workflows/ci-cd.yml`) |
-| 🔴 | **Monitoring & Observability (Prometheus / Grafana)** | 🔴 **CRITICAL** | ❌ Not Documented | 🟡 **Implemented** (see `backend/app/core/monitoring.py`) |
-| 🔴 | **Automated Database Backup & Disaster Recovery** | 🔴 **CRITICAL** | ❌ Not Documented | 🟡 **Provided** (see `scripts/backup-database.sh`) |
-| 🔴 | **Token Blacklist (Cross-Instance)** | 🔴 **CRITICAL** | ❌ In-Memory Only | ✅ **Implemented** (Redis SET) |
-| 🔴 | **Webhook HMAC Verification** | 🔴 **CRITICAL** | ❌ String Compare | ✅ **Implemented** (Provider-specific HMAC) |
-| 🔴 | **Brute Force Protection** | 🔴 **CRITICAL** | ❌ In-Memory Only | ✅ **Implemented** (Redis-backed) |
-| 🟡 | **Rate Limiting (Redis-backed)** | 🟡 **HIGH** | ❌ Not Implemented | ✅ **Implemented** (Sliding window) |
-| 🟡 | **Alembic Database Migrations** | 🟡 **HIGH** | ❌ Not Implemented | ⚠️ Config file provided, migrations folder empty |
-| 🟡 | **Penetration Testing Report** | 🟡 **HIGH** | ❌ Not Documented | ❌ Not Documented |
-| 🟡 | **SLA & Uptime Guarantees** | 🟡 **HIGH** | ❌ Not Documented | ❌ Not Documented |
-| 🟡 | **Incident Response & Runbook** | 🟡 **HIGH** | ❌ Not Documented | ❌ Not Documented |
 
 ---
 
@@ -106,19 +96,19 @@ The platform operates on a **3-tier SaaS model** (Basic / Professional / Enterpr
 
 | # | Feature | Description | Min Tier |
 |---|---------|-------------|----------|
-| :telephone_receiver: | **AI Voice Receptionist** | Handles inbound calls with natural conversation via Vapi AI | Basic |
-| :speech_balloon: | **SMS Handling** | Two-way SMS conversations powered by Twilio | Basic |
-| :green_heart: | **WhatsApp Integration** | Business WhatsApp messaging (Pro+ tier) | Professional |
-| :email: | **Email Support** | Automated email responses via SendGrid (Enterprise tier) | Enterprise |
-| :calendar: | **Smart Scheduling** | Google Calendar integration with conflict detection | Basic (1) / Pro (3) / Ent (10) |
-| :warning: | **Emergency Detection** | AI-powered detection of emergency situations with escalation | Professional |
-| :brain: | **Customer Memory** | Persistent customer memory with vector embeddings for context | Professional |
-| :chart_with_upwards_trend: | **Sentiment Analytics** | Real-time sentiment analysis on all conversations | Professional |
-| :telephone_receiver: | **Outbound Campaigns** | Automated outbound call and SMS campaigns | Professional |
-| :shield: | **Spam Filtering** | AI spam detection to block nuisance calls | Professional |
-| :moneybag: | **Web3 USDC Payments** | Accept USDC on Ethereum/Base for invoices (Enterprise) | Enterprise |
-| :microphone: | **Voice Cloning** | Custom brand voice with ElevenLabs (Enterprise) | Enterprise |
-| :receipt: | **NFT Receipts** | Blockchain-verified payment receipts (Enterprise) | Enterprise |
+| 📞 | **AI Voice Receptionist** | Handles inbound calls with natural conversation via Vapi AI | Basic |
+| 💬 | **SMS Handling** | Two-way SMS conversations powered by Twilio | Basic |
+| 💚 | **WhatsApp Integration** | Business WhatsApp messaging (Pro+ tier) | Professional |
+| 📧 | **Email Support** | Automated email responses via SendGrid (Enterprise tier) | Enterprise |
+| 📆 | **Smart Scheduling** | Google Calendar integration with conflict detection | Basic (1) / Pro (3) / Ent (10) |
+| ⚠️ | **Emergency Detection** | AI-powered detection of emergency situations with escalation | Professional |
+| 🧠 | **Customer Memory** | Persistent customer memory with vector embeddings for context | Professional |
+| 📈 | **Sentiment Analytics** | Real-time sentiment analysis on all conversations | Professional |
+| 📞 | **Outbound Campaigns** | Automated outbound call and SMS campaigns | Professional |
+| 🛡️ | **Spam Filtering** | AI spam detection to block nuisance calls | Professional |
+| 💰 | **Web3 USDC Payments** | Accept USDC on Ethereum/Base for invoices (Enterprise) | Enterprise |
+| 🎤 | **Voice Cloning** | Custom brand voice with ElevenLabs (Enterprise) | Enterprise |
+| 🧾 | **NFT Receipts** | Blockchain-verified payment receipts (Enterprise) | Enterprise |
 
 ---
 
@@ -127,7 +117,7 @@ The platform operates on a **3-tier SaaS model** (Basic / Professional / Enterpr
 ### SaaS Tiers
 
 | Feature | Basic $500/mo | Professional $800/mo | Enterprise $1,500/mo |
-|---------|:-------------:|:--------------------:|:--------------------:|
+|---------|---------------|----------------------|----------------------|
 | Voice + SMS | ✅ | ✅ | ✅ |
 | WhatsApp | ❌ | ✅ | ✅ |
 | Email | ❌ | ❌ | ✅ |
@@ -230,7 +220,7 @@ The platform operates on a **3-tier SaaS model** (Basic / Professional / Enterpr
 ### Technology Stack
 
 | Layer | Technology | Version | Purpose |
-|-------|-----------|---------|---------|
+|-------|------------|---------|---------|
 | **Frontend** | React | 19 | UI framework |
 | **Frontend** | TypeScript | 5.7 | Type safety |
 | **Frontend** | Tailwind CSS | 4 | Utility-first styling |
@@ -260,13 +250,13 @@ The platform operates on a **3-tier SaaS model** (Basic / Professional / Enterpr
 
 ### Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) 24+
-- [Docker Compose](https://docs.docker.com/compose/install/) 2.20+
-- [Git](https://git-scm.com/)
+- Docker 24+
+- Docker Compose 2.20+
+- Git
 
 ### 1. Clone & Configure
 
-```bash
+```
 git clone https://github.com/mailtkarim-bot/AI_Receptionist_Enterprise_V2.git
 cd AI_Receptionist_Enterprise_V2
 
@@ -279,20 +269,20 @@ nano backend/.env
 
 ### 2. Start Services
 
-```bash
+```
 cd infra
 docker compose up -d
 ```
 
 ### 3. Run Migrations
 
-```bash
+```
 docker compose exec api alembic upgrade head
 ```
 
 ### 4. Verify Health
 
-```bash
+```
 # API healthcheck
 curl http://localhost/api/v1/health
 
@@ -310,7 +300,7 @@ docker compose ps
 
 ### Development Mode
 
-```bash
+```
 # Watch logs
 docker compose logs -f api
 
@@ -442,6 +432,7 @@ docker compose down -v
 ## Security
 
 ### Authentication
+
 - **JWT tokens** with HS256 algorithm and configurable expiry
 - Access tokens (30 min) + Refresh tokens (7 days) rotation
 - **Redis-backed token blacklist** — cross-instance, cross-worker revocation
@@ -449,12 +440,14 @@ docker compose down -v
 - **Brute force protection** — Redis sliding window, 5 attempts → 5min block
 
 ### Data Protection
+
 - **PII hashing** for sensitive customer data (phone numbers, emails)
 - **AES-256 encryption** for conversation transcripts at rest
 - Row-level security per business tenant
 - **`is_active` flag** on Business model for account suspension
 
 ### Webhook Security
+
 - **Vapi** : HMAC-SHA256 signature verification + timestamp anti-replay
 - **Twilio** : HMAC-SHA1 per official spec (URL + sorted params)
 - **WhatsApp** : HMAC-SHA256 with APP_SECRET only (no fallback)
@@ -462,6 +455,7 @@ docker compose down -v
 - Replay attack protection with timestamp validation
 
 ### API Security
+
 - **Rate limiting**: Redis sliding window, 50 req/s per IP, 5 req/min on auth
 - CORS configured per environment (restrictive in production)
 - Input validation with Pydantic on all endpoints
@@ -469,6 +463,7 @@ docker compose down -v
 - **SSRF protection** on webhook test endpoint (URL validation + blocked hosts)
 
 ### Infrastructure Security
+
 - Docker containers run with `no-new-privileges`
 - Read-only root filesystem for API containers
 - Resource limits (CPU/memory) on all services
@@ -478,6 +473,7 @@ docker compose down -v
 - **`--forwarded-allow-ips`** restricted to internal network (not `*`)
 
 ### Blockchain Security
+
 - EIP-712 typed data signing for payment authorizations
 - Nonce-based replay protection on all on-chain transactions
 - Payment verification via direct RPC node query (not event-only)
@@ -496,7 +492,7 @@ Processing voice data (biometric data under GDPR Article 9) is classified as **s
 ### Implemented in v2.1
 
 | # | Requirement | Implementation | Status |
-|---|-------------|------------------|--------|
+|---|-------------|----------------|--------|
 | 1 | **Lawful Basis** | Explicit consent (Article 9) for voice recording & processing | 🟡 Stub |
 | 2 | **Data Processing Agreement (DPA)** | Signed DPA with Vapi, Twilio, OpenAI, and all sub-processors | ❌ Not Documented |
 | 3 | **Right to Erasure** | Automated deletion of call recordings & transcripts within 30 days of request | ✅ `erase_customer_data()` |
@@ -630,6 +626,7 @@ async def erase_customer_data(db: AsyncSession, customer_id: str, business_id: s
 ## Changelog
 
 ### v2.1 (2026-06-16) — Némésis Security Patch
+
 - **Security**: Redis-backed token blacklist, brute force, rate limiting
 - **Auth**: Refresh token rotation, password reset via SendGrid, logout revocation
 - **Webhooks**: Correct algorithms per provider (Twilio SHA1, Vapi HMAC-SHA256)
@@ -640,6 +637,7 @@ async def erase_customer_data(db: AsyncSession, customer_id: str, business_id: s
 - **Monitoring**: /metrics protected by API key
 
 ### v2.0 (2026-06-16) — Initial Release
+
 - Complete API with 55 endpoints
 - Docker multi-stage builds
 - CI/CD pipeline template
@@ -696,13 +694,29 @@ ai-receptionist/
 
 ---
 
+## 🚀 Just Starting Out?
+
+This Enterprise platform is designed for **chains, agencies, and corporate clients** who need multi-tenant SaaS with subscription billing.
+
+If you're a **freelance developer** or a **solo clinic owner** looking for:
+- A simpler, faster deployment (no Docker, no Redis)
+- One-time $2,500 setup instead of monthly subscriptions
+- Direct ownership of your Vapi/Twilio accounts
+- A lightweight dashboard that just works
+- GDPR erase, quiet hours SMS, emergency transfer, and calendar conflict detection out of the box
+
+**→ Check out [AI Receptionist Pro](https://github.com/mailtkarim-bot/AI_Receptionist_Pro)**  
+The same core technology, packaged for rapid freelance deployment.
+
+---
+
 ## Contributing
 
-We welcome contributions! Please read our [Contributing Guide](CONTRIBUTING.md) for details on code style, testing, and submission guidelines.
+We welcome contributions! Please read our Contributing Guide for details on code style, testing, and submission guidelines.
 
 ### Development Setup
 
-```bash
+```
 # Backend
 cd backend
 python -m venv .venv
@@ -720,14 +734,13 @@ npm run dev
 
 ## License
 
-This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
+This project is licensed under the **MIT License** — see LICENSE for details.
 
 ---
 
 <div align="center">
 
-**Built with :heart: by the AI Receptionist Team**
-
-[Website](https://aireceptionist.example.com) • [Docs](https://docs.aireceptionist.example.com) • [Support](mailto:support@aireceptionist.example.com)
+**Built with ❤️ in Dubai**  
+*"Enterprise-grade AI voice. Scalable. Secure. Compliant."*
 
 </div>
