@@ -1,3 +1,5 @@
+<div align="center">
+
 # 🤖 AI Receptionist Enterprise
 
 **Full-Stack SaaS Architecture Demo — v2.1**
@@ -16,6 +18,8 @@
 **AI Voice · SMS · WhatsApp · Email · Google Calendar · Web3 USDC · JWT + Redis · Docker**
 
 [📐 Architecture](#architecture) · [🚀 Quick Start](#quick-start) · [💰 Business Model Research](#business-model-research) · [🔐 Security](#security) · [📞 Contact](#contact)
+
+</div>
 
 ---
 
@@ -759,5 +763,9 @@ This project is licensed under the **MIT License** — see LICENSE for details.
 
 ---
 
+<div align="center">
+
 **Built with ❤️ in Dubai**  
 *"Enterprise-grade AI voice architecture. Demonstrated. Documented. Ready for your review."*
+
+</div>
